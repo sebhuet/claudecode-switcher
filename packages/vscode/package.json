@@ -1,0 +1,80 @@
+{
+  "name": "claudecode-switcher",
+  "displayName": "ClaudeCode Switcher",
+  "description": "Use several Claude Code accounts on one project, or a different account per project, without ever logging out. Switch from the status bar; your sessions, memory, skills and settings stay intact across all accounts.",
+  "version": "0.1.0",
+  "publisher": "prasunroy",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PRASUNR0Y/claudecode-switcher"
+  },
+  "engines": {
+    "vscode": "^1.92.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "claude",
+    "claude code",
+    "multiple accounts",
+    "account switcher",
+    "switch account",
+    "no logout",
+    "rate limit",
+    "shared memory",
+    "profiles",
+    "anthropic"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "extensionDependencies": [
+    "anthropic.claude-code"
+  ],
+  "contributes": {
+    "configuration": {
+      "title": "ClaudeCode Switcher",
+      "properties": {
+        "claudecodeSwitcher.profilesRoot": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "markdownDescription": "Where profiles live. Empty = `~/.claude-profiles`. Absolute path only (no variable substitution)."
+        },
+        "claudecodeSwitcher.statusBar.show": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the resolved account for the current folder in the status bar."
+        },
+        "claudecodeSwitcher.verifyOnActivation": {
+          "type": "boolean",
+          "default": true,
+          "description": "Check shared profiles for drift (a symlink replaced by a real directory) when VS Code starts, and offer to relink."
+        },
+        "claudecodeSwitcher.loginMethod": {
+          "type": "string",
+          "enum": [
+            "panel",
+            "terminal"
+          ],
+          "default": "panel",
+          "markdownDescription": "How to sign a new profile in. `panel` opens a new Claude conversation; the official extension shows its sign-in screen and writes credentials into the routed profile. `terminal` opens a terminal with `CLAUDE_CONFIG_DIR` set (needs `claude` on PATH)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc -p . --noEmit",
+    "package": "vsce package --no-dependencies -o ../../claudecode-switcher.vsix"
+  },
+  "icon": "icon.png",
+  "galleryBanner": {
+    "color": "#1e1e2e",
+    "theme": "dark"
+  }
+}

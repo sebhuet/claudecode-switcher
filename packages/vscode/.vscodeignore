@@ -1,0 +1,8 @@
+**
+!dist/extension.js
+!dist/claudecode-switcher-resolve.cjs
+!package.json
+!README.md
+!CHANGELOG.md
+!LICENSE
+!icon.png

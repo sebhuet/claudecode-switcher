@@ -1,0 +1,35 @@
+{
+  "name": "claudecode-switcher-cli",
+  "version": "0.1.0",
+  "description": "Use several Claude Code accounts on one project, or a different account per project, without logging out. Terminal CLI; profiles share your existing ~/.claude sessions, memory and skills. Same core as the ClaudeCode Switcher VS Code extension. Not published yet.",
+  "license": "MIT",
+  "bin": {
+    "claudecode-switcher": "dist/claudecode-switcher.cjs"
+  },
+  "files": [
+    "dist/claudecode-switcher.cjs",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "typecheck": "tsc -p . --noEmit"
+  },
+  "keywords": [
+    "claude",
+    "claude code",
+    "multiple accounts",
+    "account switcher",
+    "no logout",
+    "rate limit",
+    "shared memory",
+    "anthropic"
+  ],
+  "private": true
+}
