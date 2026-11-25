@@ -6,7 +6,7 @@
  */
 import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
-import { CREDENTIALS_FILE, Paths, ROOT_JSON, profileClaudeJson, profileDir } from './paths';
+import { CREDENTIALS_FILE, Paths, ROOT_JSON, pathKey, profileClaudeJson, profileDir } from './paths';
 import { ClaudeCodeSwitcherError } from './errors';
 import { ensureDir, exists, lstatOrNull, moveAside, statOrNull } from './fsx';
 
@@ -103,7 +103,37 @@ async function readLinkOrNull(p: string): Promise<string | null> {
 
 function sameTarget(link: string, linkPath: string, wanted: string): boolean {
   const abs = path.isAbsolute(link) ? link : path.resolve(path.dirname(linkPath), link);
-  return path.resolve(abs) === path.resolve(wanted);
+  return pathKey(path.resolve(abs)) === pathKey(path.resolve(wanted));
+}
+
+/**
+ * Windows: a directory link is a junction (no privilege needed); a file link
+ * needs Developer Mode (or admin) and fails with EPERM without it.
+ */
+export async function assertCanLinkFiles(dir: string): Promise<void> {
+  if (process.platform !== 'win32') return;
+  const probe = path.join(dir, `.symlink-probe-${process.pid}`);
+  try {
+    await linkEntry(probe, probe, 'file'); // dangling is fine: only the privilege is tested
+  } finally {
+    await fsp.rm(probe, { force: true });
+  }
+}
+
+async function linkEntry(target: string, linkPath: string, kind: EntryKind): Promise<void> {
+  const win = process.platform === 'win32';
+  try {
+    await fsp.symlink(target, linkPath, kind === 'dir' ? (win ? 'junction' : 'dir') : 'file');
+  } catch (e) {
+    if (win && (e as NodeJS.ErrnoException).code === 'EPERM') {
+      throw new ClaudeCodeSwitcherError(
+        'SYMLINK_PRIVILEGE',
+        `Windows refused to create the file symlink ${linkPath}. Turn on Developer Mode ` +
+          '(Settings > System > For developers), then run "Verify and repair links".',
+      );
+    }
+    throw e;
+  }
 }
 
 /**
@@ -160,7 +190,7 @@ export async function linkProfile(p: Paths, name: string): Promise<LinkResult> {
       }
     }
     await ensureDir(path.dirname(linkPath));
-    await fsp.symlink(target, linkPath, entry.kind === 'dir' ? 'dir' : 'file');
+    await linkEntry(target, linkPath, entry.kind);
     res.linked.push(entry.rel);
   }
   return res;

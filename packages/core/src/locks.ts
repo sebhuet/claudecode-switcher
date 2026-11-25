@@ -6,7 +6,7 @@
 import * as crypto from 'node:crypto';
 import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
-import { Paths, stripTrailingSlash } from './paths';
+import { Paths, pathKey, stripTrailingSlash } from './paths';
 import { ensureDir, readJson, writeJsonAtomic } from './fsx';
 
 export interface Lock {
@@ -17,7 +17,7 @@ export interface Lock {
 }
 
 export function lockFileFor(p: Paths, projectPath: string): string {
-  const h = crypto.createHash('sha1').update(stripTrailingSlash(path.resolve(projectPath))).digest('hex').slice(0, 16);
+  const h = crypto.createHash('sha1').update(pathKey(stripTrailingSlash(path.resolve(projectPath)))).digest('hex').slice(0, 16);
   return path.join(p.locksDir, `${h}.json`);
 }
 

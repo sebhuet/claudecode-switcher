@@ -7,6 +7,7 @@
  */
 import * as fs from 'node:fs';
 import * as fsp from 'node:fs/promises';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import * as vscode from 'vscode';
@@ -88,12 +89,13 @@ export function findNode(log: Log): string | undefined {
 }
 
 export function findClaude(): string | undefined {
+  const exe = process.platform === 'win32' ? 'claude.exe' : 'claude';
   for (const dir of (process.env.PATH ?? '').split(path.delimiter)) {
-    const cand = path.join(dir, 'claude');
+    const cand = path.join(dir, exe);
     if (dir && isExecutable(cand)) return cand;
   }
-  const home = process.env.HOME ?? '';
-  for (const cand of [path.join(home, '.local', 'bin', 'claude'), '/usr/local/bin/claude', '/opt/homebrew/bin/claude']) {
+  const home = process.env.HOME ?? os.homedir();
+  for (const cand of [path.join(home, '.local', 'bin', exe), '/usr/local/bin/claude', '/opt/homebrew/bin/claude']) {
     if (isExecutable(cand)) return cand;
   }
   return undefined;
@@ -173,10 +175,6 @@ export async function enableRouting(ctx: vscode.ExtensionContext, p: core.Paths,
     void vscode.window.showErrorMessage(
       `Folder routing needs the official Claude Code extension (${OFFICIAL_EXT_ID}) installed; its claudeCode.claudeProcessWrapper setting is what routes new sessions.`,
     );
-    return false;
-  }
-  if (process.platform === 'win32') {
-    void vscode.window.showErrorMessage('The generated wrapper is a bash script; routing needs macOS, Linux, WSL or code-server. Profiles still work: set CLAUDE_CONFIG_DIR yourself.');
     return false;
   }
   const state = routingState(p);

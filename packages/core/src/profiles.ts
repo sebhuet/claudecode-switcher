@@ -20,7 +20,7 @@ import {
 } from './paths';
 import { ClaudeCodeSwitcherError, ModeChangeRefusedError } from './errors';
 import { chmodQuiet, ensureDir, exists, lstatOrNull, readJson, timestampSlug, writeJsonAtomic } from './fsx';
-import { StorageMode, hasTopLevelSymlinks, linkProfile, LinkResult } from './storage';
+import { StorageMode, assertCanLinkFiles, hasTopLevelSymlinks, linkProfile, LinkResult } from './storage';
 import { SeedOptions, SeedResult, seedProfile } from './seed';
 import { removeMappingsFor } from './map';
 
@@ -156,6 +156,7 @@ export async function createProfile(p: Paths, name: string, opts: CreateOptions)
   if (opts.mode === 'shared' && !(await exists(p.claudeDir))) {
     throw new ClaudeCodeSwitcherError('NO_DEFAULT', `${p.claudeDir} does not exist yet; run Claude Code once on the default account before creating a shared profile.`);
   }
+  if (opts.mode === 'shared') await assertCanLinkFiles(p.profilesRoot);
 
   await fsp.mkdir(dir, { mode: 0o700 });
   const meta: ProfileMeta = {

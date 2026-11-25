@@ -93,9 +93,9 @@ export function configDirEnvFor(p: Paths, name: string): string | undefined {
 /** Reverse lookup: which profile owns this config directory, if any. */
 export function profileNameForDir(p: Paths, dir: string): string | undefined {
   const norm = stripTrailingSlash(path.resolve(dir));
-  if (norm === stripTrailingSlash(p.claudeDir)) return DEFAULT_PROFILE;
+  if (pathKey(norm) === pathKey(stripTrailingSlash(p.claudeDir))) return DEFAULT_PROFILE;
   const root = stripTrailingSlash(p.profilesRoot);
-  if (norm.startsWith(root + path.sep)) {
+  if (pathKey(norm).startsWith(pathKey(root + path.sep))) {
     const rel = norm.slice(root.length + 1);
     if (!rel.includes(path.sep) && !RESERVED_DIRS.has(rel)) return rel;
   }
@@ -110,6 +110,11 @@ export function expandHome(p: Paths, target: string): string {
 
 export function stripTrailingSlash(s: string): string {
   return s.length > 1 && s.endsWith('/') ? s.replace(/\/+$/, '') : s;
+}
+
+/** Path comparison key: Windows paths are case-insensitive (`d:\x` and `D:\X` are one folder). */
+export function pathKey(s: string): string {
+  return process.platform === 'win32' ? s.toLowerCase() : s;
 }
 
 const NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;

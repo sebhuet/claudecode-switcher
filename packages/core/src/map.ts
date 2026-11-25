@@ -5,7 +5,7 @@
  */
 import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
-import { Paths, expandHome, stripTrailingSlash } from './paths';
+import { Paths, expandHome, pathKey, stripTrailingSlash } from './paths';
 import { ensureDir, writeTextAtomic } from './fsx';
 
 export interface MapEntry {
@@ -58,7 +58,7 @@ export async function writeMap(p: Paths, entries: MapEntry[]): Promise<void> {
 /** Route `folder` to `profile`. Pass profile `default` to route explicitly to the default account. */
 export async function setMapping(p: Paths, folder: string, profile: string): Promise<MapEntry[]> {
   const prefix = stripTrailingSlash(path.resolve(folder));
-  const entries = (await readMap(p)).filter((e) => e.prefix !== prefix);
+  const entries = (await readMap(p)).filter((e) => pathKey(e.prefix) !== pathKey(prefix));
   entries.push({ prefix, profile });
   await writeMap(p, entries);
   return entries;
@@ -67,7 +67,7 @@ export async function setMapping(p: Paths, folder: string, profile: string): Pro
 export async function removeMapping(p: Paths, folder: string): Promise<boolean> {
   const prefix = stripTrailingSlash(path.resolve(folder));
   const before = await readMap(p);
-  const after = before.filter((e) => e.prefix !== prefix);
+  const after = before.filter((e) => pathKey(e.prefix) !== pathKey(prefix));
   if (after.length === before.length) return false;
   await writeMap(p, after);
   return true;
@@ -83,9 +83,9 @@ export async function removeMappingsFor(p: Paths, profile: string): Promise<stri
 
 /** Path-boundary prefix match: `/a/b` matches `/a/b` and `/a/b/c`, never `/a/bc`. */
 export function prefixMatches(prefix: string, dir: string): boolean {
-  const pfx = stripTrailingSlash(prefix);
-  const d = stripTrailingSlash(dir);
-  if (pfx === '/') return true;
+  const pfx = pathKey(stripTrailingSlash(prefix));
+  const d = pathKey(stripTrailingSlash(dir));
+  if (pfx.endsWith(path.sep)) return d.startsWith(pfx); // a root: `/` or `D:\`
   return d === pfx || d.startsWith(pfx + path.sep);
 }
 

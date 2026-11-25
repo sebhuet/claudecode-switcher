@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.1
+
+- **Windows support.** Routing works on plain Windows: the wrapper is a `.exe` compiled
+  on activation with the .NET Framework `csc.exe`, kills its `claude.exe` with it (job
+  object) and passes the command line through verbatim. Shared accounts link folders with
+  junctions and files with symlinks (Developer Mode required, checked before the account
+  is created). Folder routing compares paths case-insensitively on Windows.
+
 ## 0.1.0
 
 Initial release.

@@ -43,9 +43,21 @@ Confirm with `/usage` inside a conversation: it names the billing account.
 ## Requirements
 
 - The official Claude Code extension (installed automatically as a dependency).
-- macOS, Linux, WSL or code-server. The routing script is bash; on plain Windows
-  accounts still work if you set `CLAUDE_CONFIG_DIR` yourself.
+- macOS, Linux, WSL, code-server or Windows 10/11.
 - `node` on your `PATH`, or VS Code's own runtime is used as a fallback.
+
+### Windows
+
+- The official extension starts the wrapper without a shell, so on Windows it is
+  a small `.exe` compiled on activation from generated C# source
+  (`_bin/claudecode-switcher-wrapper.cs`) with the `csc.exe` that ships with
+  .NET Framework 4 on every Windows 10/11. The child `claude.exe` is tied to
+  the wrapper by a job object, so stopping a conversation stops both.
+- Shared accounts link folders with junctions (no rights needed) and four files
+  (`settings.json`, `CLAUDE.md`, `keybindings.json`, `history.jsonl`) with
+  symlinks, which Windows only allows with **Developer Mode** on
+  (Settings > System > For developers). Without it, adding an account fails
+  with a message saying so, before anything is created.
 
 ## The status bar is the whole UI
 
