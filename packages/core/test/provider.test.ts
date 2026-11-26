@@ -4,7 +4,8 @@ import * as fs from 'node:fs';
 import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import { sandbox, write } from './helpers';
-import { PROVIDER_SETTINGS, Provider, createProfile, getProfile, listProfiles, providerSettings } from '../src/profiles';
+import { PROVIDER_SETTINGS, createProfile, getProfile, listProfiles } from '../src/profiles';
+import { Provider, providerSettings } from '../src/engines';
 import { doctor } from '../src/doctor';
 
 const ollama: Provider = { kind: 'ollama', baseUrl: 'http://localhost:11434', model: 'qwen3-coder' };
@@ -74,7 +75,9 @@ test('accounts written by 0.2.0 and unknown engines are read without failing', a
     await write(path.join(sb.p.profilesRoot, 'Future', 'profile.json'), JSON.stringify(meta('Future', { kind: 'future', model: 'm' })));
     assert.deepEqual((await getProfile(sb.p, 'Old'))?.meta?.provider, ollama);
     assert.deepEqual((await listProfiles(sb.p)).map((x) => x.name), ['default', 'Future', 'Old']);
-    assert.equal((await doctor(sb.p)).profiles.length, 3);
+    const rep = await doctor(sb.p);
+    assert.equal(rep.profiles.length, 3);
+    assert.ok(rep.profiles.every((r) => r.findings.every((f) => !f.message.includes('undefined'))), JSON.stringify(rep, null, 1));
   } finally {
     await sb.cleanup();
   }

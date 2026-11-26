@@ -23,6 +23,7 @@ import { chmodQuiet, ensureDir, exists, lstatOrNull, readJson, timestampSlug, wr
 import { StorageMode, assertCanLinkFiles, hasTopLevelSymlinks, linkProfile, LinkResult } from './storage';
 import { SeedOptions, SeedResult, seedProfile } from './seed';
 import { removeMappingsFor } from './map';
+import { Provider, providerSettings, validateProvider } from './engines';
 
 export const SCHEMA_VERSION = 3;
 
@@ -35,44 +36,12 @@ export interface ProfileMeta {
   sharedTarget?: string;
   /** Set by the legacy importer when a v2 (prior-art) profile was adopted. */
   importedFrom?: string;
-  /** A non-Anthropic backend: no sign-in, requests go to `baseUrl` with this model. */
+  /** A non-Anthropic backend (see engines.ts): no sign-in. */
   provider?: Provider;
 }
 
-export interface Provider {
-  kind: 'ollama';
-  baseUrl: string;
-  model: string;
-}
-
-const MODEL_VARS = [
-  'ANTHROPIC_MODEL',
-  'ANTHROPIC_DEFAULT_OPUS_MODEL',
-  'ANTHROPIC_DEFAULT_SONNET_MODEL',
-  'ANTHROPIC_DEFAULT_HAIKU_MODEL',
-  'ANTHROPIC_DEFAULT_FABLE_MODEL',
-  'CLAUDE_CODE_SUBAGENT_MODEL',
-];
-
 /** Written into a provider profile's directory; the wrapper passes it as `--settings`. */
 export const PROVIDER_SETTINGS = 'provider-settings.json';
-
-/**
- * Settings for a provider profile. They go in through `--settings`, which outranks the
- * user's settings.json: a shared profile links that file, and its `model` or `env` would
- * otherwise send Claude model names to Ollama. Every alias maps to the one model.
- */
-export function providerSettings(pr: Provider): { model: string; env: Record<string, string> } {
-  const env: Record<string, string> = { ANTHROPIC_BASE_URL: pr.baseUrl, ANTHROPIC_AUTH_TOKEN: pr.kind, ANTHROPIC_API_KEY: '' };
-  for (const v of MODEL_VARS) env[v] = pr.model;
-  return { model: pr.model, env };
-}
-
-function validateProvider(pr: Provider): void {
-  if (pr.kind !== 'ollama') throw new ClaudeCodeSwitcherError('BAD_PROVIDER', `Unknown provider "${String(pr.kind)}".`);
-  if (!/^https?:\/\/\S+$/.test(pr.baseUrl)) throw new ClaudeCodeSwitcherError('BAD_PROVIDER', `"${pr.baseUrl}" is not an http(s) URL.`);
-  if (!/^\S+$/.test(pr.model)) throw new ClaudeCodeSwitcherError('BAD_PROVIDER', `"${pr.model}" is not a model name.`);
-}
 
 export interface AccountIdentity {
   /** Login presence only — never token values. */

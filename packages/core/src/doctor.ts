@@ -9,6 +9,7 @@ import { listProfiles, ProfileInfo } from './profiles';
 import { Finding, verifyProfile } from './storage';
 import { readMap } from './map';
 import { listAllLocks } from './locks';
+import { providerLabel } from './engines';
 
 export interface ProfileReport {
   profile: ProfileInfo;
@@ -52,7 +53,7 @@ export async function doctor(p: Paths): Promise<DoctorReport> {
     }
     const prov = pr.meta?.provider;
     if (prov) {
-      findings.push({ severity: 'info', code: 'PROVIDER', message: `Uses ${prov.kind} (${prov.model} at ${prov.baseUrl}); no sign-in.` });
+      findings.push({ severity: 'info', code: 'PROVIDER', message: `Uses ${providerLabel(prov, true)}; no sign-in.` });
     } else if (!pr.loggedIn) {
       findings.push({ severity: 'info', code: 'NOT_LOGGED_IN', message: `Not logged in (no oauthAccount in ${ROOT_JSON}).` });
     } else if (pr.accountUuid) {
