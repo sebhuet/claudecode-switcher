@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.0
+
+- **Engines.** Non-Anthropic backends are now a small registry
+  (`packages/core/src/engines.ts`); adding one is an object and a line, with no change
+  to the wrapper or the extension. Existing Ollama accounts are read as they are.
+- **Anthropic-compatible server.** A second engine for any server speaking the Anthropic
+  Messages API (LM Studio, llama.cpp, vLLM, LiteLLM, OpenRouter…): server URL, optional
+  API key, model listed by `/v1/models` or typed. The key is written to the account's
+  `provider-settings.json` only, never to `profile.json`.
+- **`claudecodeSwitcher.engineMode`** picks shared or separate storage for every engine;
+  `ollamaMode` is deprecated and still read while it is unset.
+- **Check health** reports an engine unknown to this version, and an engine account whose
+  `provider-settings.json` is missing (its conversations would go to Anthropic).
+
 ## 0.2.0
 
 - **Ollama accounts.** `Add another account… → Ollama` routes a folder to a model served

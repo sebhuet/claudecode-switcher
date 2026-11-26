@@ -2,7 +2,7 @@
   "name": "claudecode-switcher",
   "displayName": "ClaudeCode Switcher",
   "description": "Use several Claude Code accounts on one project, or a different account per project, without ever logging out, or a local Ollama model. Switch from the status bar; your sessions, memory, skills and settings stay intact across all accounts.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "prasunroy",
   "license": "MIT",
   "repository": {

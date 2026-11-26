@@ -9,8 +9,9 @@ VS Code extension. Three things it does:
 2. **A different account for each project.** Work account in the work repo,
    personal in the side project, a client's in theirs. Route a folder once and
    every new conversation there uses the right account, automatically.
-3. **A local model.** An Ollama account sends a folder's conversations to a
-   model running on your machine, with no sign-in.
+3. **Another model.** An engine account sends a folder's conversations to a
+   local Ollama model or to any Anthropic-compatible server (LM Studio,
+   llama.cpp, vLLM, LiteLLM, OpenRouter…), with no sign-in.
 
 Every Claude account has its own login and its own usage limits. Everything else is
 shared, automatically: all accounts read and write the same `~/.claude`, so
@@ -35,7 +36,7 @@ keep the account they started with.
 Install *ClaudeCode Switcher* from the Marketplace (needs the official Claude
 Code extension). Click **Claude: default** in the status bar →
 **Add another account…** → **Claude account** → name it → sign in, or
-**Ollama** → pick a model. Done. The status bar menu is the whole UI; there are
+an engine → pick a model. Done. The status bar menu is the whole UI; there are
 no command palette entries. On Windows, turn on Developer Mode first.
 
 Full user docs: [packages/vscode/README.md](packages/vscode/README.md).
@@ -47,7 +48,7 @@ setting. With your consent, the extension points it at a small generated script.
 Each time a **new** Claude process starts, the script asks one resolver which
 `CLAUDE_CONFIG_DIR` the process should get, exports it, and runs the real
 binary untouched. An account is a directory holding only the login; everything
-else is a symlink back into `~/.claude`. An Ollama account also holds
+else is a symlink back into `~/.claude`. An engine account also holds
 `provider-settings.json`, which the script passes with `--settings`.
 
 Resolution order, first match wins: `CLAUDE_CONFIG_DIR` already set →
@@ -65,6 +66,7 @@ packages/
 ├── core/     routing + storage; no vscode imports, no CLI deps, no process.exit
 │   ├── src/paths.ts        every ~/.claude vs CLAUDE_CONFIG_DIR asymmetry, in one place
 │   ├── src/profiles.ts     create / list / delete; the ONLY writer of profile.json `mode`
+│   ├── src/engines.ts      non-Anthropic engines (Ollama, Anthropic-compatible): the registry
 │   ├── src/resolve.ts      THE resolver — the only routing implementation
 │   ├── src/storage.ts      shared-path manifest; link / verify / relink
 │   ├── src/seed.ts         trust + onboarding into new profiles, never credentials
@@ -87,6 +89,24 @@ npm run e2e:win        # Windows: the compiled wrapper, against a temp $HOME
 npm run package        # → claudecode-switcher.vsix
 ```
 
+## Adding an engine
+
+An engine is one `Engine` object in
+[engines.ts](packages/core/src/engines.ts) and its entry in `ENGINES`:
+
+- `fields`: what to ask (URL, key…), with a default, a validator and `secret`
+  for values that must stay out of `profile.json`. The extension asks them in
+  order (`engine-prompt.ts`); no UI code per engine.
+- `listModels`: the models to pick from; an empty list means typed by hand.
+- `settings`: what goes into `provider-settings.json`. For a server speaking
+  the Anthropic Messages API, `anthropicCompat(pr, token)` maps every model
+  alias to the chosen model.
+
+Then tests in `packages/core/test/engines.test.ts` (`settings()` as a literal,
+`listModels` against a local server), the user docs, and one real conversation
+in the panel (the wrapper log says `provider=yes`). The wrapper, `profiles.ts`,
+`doctor.ts` and the extension need no change.
+
 ## Layout of an account directory
 
 ```
@@ -94,7 +114,7 @@ npm run package        # → claudecode-switcher.vsix
 ├── .claude.json         REAL  oauthAccount — the login identity
 ├── .credentials.json    REAL  (Linux; macOS uses Keychain keyed off the dir path)
 ├── profile.json         REAL  { mode: "shared", ... } written once by createProfile
-├── provider-settings.json  REAL  Ollama accounts only: URL, token, model for every alias
+├── provider-settings.json  REAL  engine accounts only: URL, token, model for every alias
 ├── statsig/ usage-data/ sessions/ …   REAL  per-account / live process state
 ├── projects/     -> ~/.claude/projects       transcripts AND memory (projects/<p>/memory/)
 ├── skills/ plugins/ commands/ agents/ …  -> ~/.claude/…

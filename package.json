@@ -1,7 +1,7 @@
 {
   "name": "claudecode-switcher",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Use several Claude Code accounts on one project, or one account per project, without logging out. Shared memory and sessions across accounts. VS Code extension + CLI.",
   "workspaces": [
     "packages/core",

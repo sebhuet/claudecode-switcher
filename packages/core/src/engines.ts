@@ -66,7 +66,8 @@ export function anthropicCompat(pr: Provider, token?: string): { model: string; 
 const httpUrl = (v: string): string | undefined => (/^https?:\/\/\S+$/.test(v) ? undefined : `"${v}" is not an http(s) URL.`);
 
 async function getJson(url: string, token?: string): Promise<unknown> {
-  const res = await fetch(url, { signal: AbortSignal.timeout(5000), headers: token ? { authorization: `Bearer ${token}` } : {} });
+  const headers: Record<string, string> = token ? { authorization: `Bearer ${token}`, 'x-api-key': token } : {};
+  const res = await fetch(url, { signal: AbortSignal.timeout(5000), headers });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
@@ -89,7 +90,26 @@ const ollama: Engine = {
   settings: (pr) => anthropicCompat(pr),
 };
 
-export const ENGINES: Engine[] = [ollama];
+/** Any server speaking the Anthropic Messages API: LM Studio, llama.cpp, vLLM, LiteLLM, OpenRouter… */
+const gateway: Engine = {
+  kind: 'gateway',
+  label: 'Anthropic-compatible server',
+  description: 'LM Studio, llama.cpp, vLLM, LiteLLM, OpenRouter… (Messages API)',
+  fields: [
+    { key: 'baseUrl', title: 'server URL', validate: httpUrl },
+    { key: 'token', title: 'API key (empty if none)', secret: true },
+  ],
+  async listModels(o) {
+    try {
+      return (((await getJson(`${o.baseUrl}/v1/models`, o.token)) as { data?: { id: string }[] }).data ?? []).map((m) => ({ name: m.id }));
+    } catch {
+      return []; // not every server lists its models: the model is then typed by hand
+    }
+  },
+  settings: (pr) => anthropicCompat(pr, pr.token),
+};
+
+export const ENGINES: Engine[] = [ollama, gateway];
 
 export function getEngine(kind: string): Engine | undefined {
   return ENGINES.find((e) => e.kind === kind);
@@ -109,6 +129,12 @@ export function validateProvider(pr: Provider): Engine {
 /** What provider-settings.json holds for this account. */
 export function providerSettings(pr: Provider): { model: string; env: Record<string, string> } {
   return validateProvider(pr).settings(pr);
+}
+
+/** The provider as stored in profile.json: without its secret fields, which live in provider-settings.json only. */
+export function publicProvider(pr: Provider): Provider {
+  const secret = new Set(getEngine(pr.kind)?.fields.filter((f) => f.secret).map((f) => f.key));
+  return Object.fromEntries(Object.entries(pr).filter(([k]) => !secret.has(k))) as Provider;
 }
 
 /** `Ollama · qwen3-coder`, with ` at <url>` when asked and the engine has one. Works for unknown kinds. */

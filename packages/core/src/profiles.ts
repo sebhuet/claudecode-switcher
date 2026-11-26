@@ -23,7 +23,7 @@ import { chmodQuiet, ensureDir, exists, lstatOrNull, readJson, timestampSlug, wr
 import { StorageMode, assertCanLinkFiles, hasTopLevelSymlinks, linkProfile, LinkResult } from './storage';
 import { SeedOptions, SeedResult, seedProfile } from './seed';
 import { removeMappingsFor } from './map';
-import { Provider, providerSettings, validateProvider } from './engines';
+import { Provider, providerSettings, publicProvider, validateProvider } from './engines';
 
 export const SCHEMA_VERSION = 3;
 
@@ -173,7 +173,7 @@ export async function createProfile(p: Paths, name: string, opts: CreateOptions)
     createdAt: new Date().toISOString(),
     schemaVersion: SCHEMA_VERSION,
     ...(opts.mode === 'shared' ? { sharedTarget: p.claudeDir } : {}),
-    ...(opts.provider ? { provider: opts.provider } : {}),
+    ...(opts.provider ? { provider: publicProvider(opts.provider) } : {}),
   };
   await writeJsonAtomic(profileMeta(p, name), meta, 0o600);
   if (opts.provider) await writeJsonAtomic(path.join(dir, PROVIDER_SETTINGS), providerSettings(opts.provider), 0o600);

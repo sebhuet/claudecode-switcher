@@ -85,3 +85,18 @@ test('accounts written by 0.2.0 and unknown engines are read without failing', a
     await sb.cleanup();
   }
 });
+
+test('a secret field reaches provider-settings.json, never profile.json', async () => {
+  const sb = await sandbox();
+  try {
+    const provider = { kind: 'gateway', baseUrl: 'https://gw.example', model: 'glm-4.6', token: 'sk-SECRET' };
+    await createProfile(sb.p, 'Gw', { mode: 'shared', provider });
+    const dir = path.join(sb.p.profilesRoot, 'Gw');
+    assert.ok(!(await fsp.readFile(path.join(dir, 'profile.json'), 'utf8')).includes('sk-SECRET'));
+    assert.equal(JSON.parse(await fsp.readFile(path.join(dir, PROVIDER_SETTINGS), 'utf8')).env.ANTHROPIC_AUTH_TOKEN, 'sk-SECRET');
+    assert.deepEqual((await getProfile(sb.p, 'Gw'))?.meta?.provider, { kind: 'gateway', baseUrl: 'https://gw.example', model: 'glm-4.6' });
+    assert.ok(!JSON.stringify(await doctor(sb.p)).includes('sk-SECRET'));
+  } finally {
+    await sb.cleanup();
+  }
+});
