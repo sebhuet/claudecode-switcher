@@ -1,6 +1,6 @@
 // Windows end-to-end test of the compiled wrapper, in a throwaway $HOME. Never touches
 // your real ~/.claude. Run after `npm run build`:  node scripts/e2e-win.cjs
-// Covers: routing via the map (stale PWD, lowercase drive), verbatim argv, kill-on-close,
+// Covers: routing via the map (stale PWD, lowercase drive), verbatim argv, an Ollama profile's env, kill-on-close,
 // recompiling while the exe is locked, and a shared profile (needs Developer Mode).
 const assert = require('node:assert/strict');
 const cp = require('node:child_process');
@@ -39,7 +39,7 @@ const pass = (what) => console.log(`ok - ${what}`);
   const probe = path.join(sb, 'probe.cjs');
   fs.writeFileSync(probe, 'console.log(JSON.stringify({dir:process.env.CLAUDE_CONFIG_DIR??null,args:process.argv.slice(2)}))');
   const env = { ...process.env, PWD: 'C:\\stale' };
-  delete env.CLAUDE_CONFIG_DIR;
+  for (const k of Object.keys(env)) if (/^(CLAUDE_CONFIG_DIR|ANTHROPIC_|CLAUDE_CODE_SUBAGENT_MODEL)/.test(k)) delete env[k];
   const args = ['--settings', '{"a":"b c","q":"\\"x\\""}', 'with space', 'trailing\\'];
   const lowerDrive = proj[0].toLowerCase() + proj.slice(1);
   const r = cp.spawnSync(res.wrapperPath, [process.execPath, probe, ...args], { cwd: lowerDrive, env, encoding: 'utf8', windowsHide: true });
@@ -49,6 +49,16 @@ const pass = (what) => console.log(`ok - ${what}`);
   pass('routed by the map (stale PWD, lowercase drive)');
   assert.deepEqual(out.args, args);
   pass('argv passed through verbatim');
+
+  await core.createProfile(p, 'Local', { mode: 'own', provider: { kind: 'ollama', baseUrl: 'http://localhost:11434', model: 'qwen3:8b' } });
+  const lproj = path.join(sb, 'Local Proj');
+  fs.mkdirSync(lproj);
+  await core.setMapping(p, lproj, 'Local');
+  const settings = path.join(p.profilesRoot, 'Local', core.PROVIDER_SETTINGS);
+  const lr = cp.spawnSync(res.wrapperPath, [process.execPath, probe, 'x y'], { cwd: lproj, env, encoding: 'utf8', windowsHide: true });
+  assert.deepEqual(JSON.parse(lr.stdout).args, ['x y', '--settings', settings]);
+  assert.equal(JSON.parse(fs.readFileSync(settings, 'utf8')).env.ANTHROPIC_DEFAULT_OPUS_MODEL, 'qwen3:8b');
+  pass('Ollama profile: --settings appended after the verbatim args');
 
   const c = cp.spawn(res.wrapperPath, [process.execPath, '-e', 'console.log(process.pid);setInterval(()=>{},1000)'], { cwd: proj, env, windowsHide: true });
   const childPid = await new Promise((ok) => c.stdout.once('data', (d) => ok(Number(String(d).trim()))));

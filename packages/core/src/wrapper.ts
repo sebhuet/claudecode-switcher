@@ -18,6 +18,7 @@ import * as path from 'node:path';
 import { promisify } from 'node:util';
 import { Paths } from './paths';
 import { ClaudeCodeSwitcherError } from './errors';
+import { PROVIDER_SETTINGS } from './profiles';
 import { chmodQuiet, ensureDir, writeTextAtomic } from './fsx';
 
 const IS_WIN = process.platform === 'win32';
@@ -95,19 +96,25 @@ elif [ -f "$RESOLVE" ]; then
   # rc 3 = unknown profile name: resolve already warned on stderr; fall back to default loudly.
 fi
 
+# A provider profile (Ollama) carries settings that must outrank the user's settings.json.
+PS=""
+if [ -n "\${CLAUDE_CONFIG_DIR:-}" ] && [ -f "$CLAUDE_CONFIG_DIR/${PROVIDER_SETTINGS}" ]; then PS="$CLAUDE_CONFIG_DIR/${PROVIDER_SETTINGS}"; fi
+
 # Breadcrumb: paths and profile names only, never tokens.
-log "pwd=$PWD config=\${CLAUDE_CONFIG_DIR:-default} rc=$rc argv1=\${1:-<none>}"
+log "pwd=$PWD config=\${CLAUDE_CONFIG_DIR:-default} provider=\${PS:+yes} rc=$rc argv1=\${1:-<none>}"
 if [ -f "$LOG" ] && [ "$(wc -l < "$LOG" 2>/dev/null || echo 0)" -gt 500 ]; then
   tail -n 250 "$LOG" > "$LOG.tmp" 2>/dev/null && mv "$LOG.tmp" "$LOG" 2>/dev/null || true
 fi
 
 # Three argv shapes.
 if [ "$#" -eq 0 ]; then
-  if command -v claude >/dev/null 2>&1; then exec claude; fi
-  if [ -n "$CLAUDE_FALLBACK" ] && [ -x "$CLAUDE_FALLBACK" ]; then exec "$CLAUDE_FALLBACK"; fi
+  if [ -n "$PS" ]; then set -- --settings "$PS"; fi
+  if command -v claude >/dev/null 2>&1; then exec claude "$@"; fi
+  if [ -n "$CLAUDE_FALLBACK" ] && [ -x "$CLAUDE_FALLBACK" ]; then exec "$CLAUDE_FALLBACK" "$@"; fi
   echo "claudecode-switcher-wrapper: no arguments and no 'claude' on PATH" >&2
   exit 127
 fi
+if [ -n "$PS" ]; then set -- "$@" --settings "$PS"; fi
 case "$1" in
   *.js|*.cjs|*.mjs)
     if nb="$(node_bin)"; then exec "$nb" "$@"; fi
@@ -147,12 +154,17 @@ static class Wrapper {
   const string NODE_BIN = ${cs(o.nodePath ?? '')};
   const string ELECTRON_BIN = ${cs(o.electronPath ?? '')};
   const string CLAUDE_FALLBACK = ${cs(o.claudePath ?? '')};
+  const string PROVIDER_SETTINGS = ${cs(PROVIDER_SETTINGS)};
 
   static int Main(string[] args) {
     string rc = "skipped";
     if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR"))) rc = "explicit";
     else if (File.Exists(RESOLVE)) rc = Resolve();
-    Log("pwd=" + Environment.CurrentDirectory + " config=" + (Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR") ?? "default") +
+    // A provider profile (Ollama) carries settings that must outrank the user's settings.json.
+    string cfg = Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR"), extra = "";
+    if (!string.IsNullOrEmpty(cfg) && File.Exists(Path.Combine(cfg, PROVIDER_SETTINGS)))
+      extra = " --settings " + Quote(Path.Combine(cfg, PROVIDER_SETTINGS));
+    Log("pwd=" + Environment.CurrentDirectory + " config=" + (cfg ?? "default") + " provider=" + (extra.Length > 0 ? "yes" : "") +
         " rc=" + rc + " argv1=" + (args.Length > 0 ? args[0] : "<none>"));
 
     string app, cmd;
@@ -168,7 +180,7 @@ static class Wrapper {
         cmd = Quote(app) + " " + tail;
       } else { app = args[0]; cmd = tail; }
     }
-    return Run(app, cmd);
+    return Run(app, cmd + extra);
   }
 
   // node, else VS Code's Electron as node. Sets ELECTRON_RUN_AS_NODE for children when it falls back.

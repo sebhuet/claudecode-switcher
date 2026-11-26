@@ -35,6 +35,43 @@ export interface ProfileMeta {
   sharedTarget?: string;
   /** Set by the legacy importer when a v2 (prior-art) profile was adopted. */
   importedFrom?: string;
+  /** A non-Anthropic backend: no sign-in, requests go to `baseUrl` with this model. */
+  provider?: Provider;
+}
+
+export interface Provider {
+  kind: 'ollama';
+  baseUrl: string;
+  model: string;
+}
+
+const MODEL_VARS = [
+  'ANTHROPIC_MODEL',
+  'ANTHROPIC_DEFAULT_OPUS_MODEL',
+  'ANTHROPIC_DEFAULT_SONNET_MODEL',
+  'ANTHROPIC_DEFAULT_HAIKU_MODEL',
+  'ANTHROPIC_DEFAULT_FABLE_MODEL',
+  'CLAUDE_CODE_SUBAGENT_MODEL',
+];
+
+/** Written into a provider profile's directory; the wrapper passes it as `--settings`. */
+export const PROVIDER_SETTINGS = 'provider-settings.json';
+
+/**
+ * Settings for a provider profile. They go in through `--settings`, which outranks the
+ * user's settings.json: a shared profile links that file, and its `model` or `env` would
+ * otherwise send Claude model names to Ollama. Every alias maps to the one model.
+ */
+export function providerSettings(pr: Provider): { model: string; env: Record<string, string> } {
+  const env: Record<string, string> = { ANTHROPIC_BASE_URL: pr.baseUrl, ANTHROPIC_AUTH_TOKEN: pr.kind, ANTHROPIC_API_KEY: '' };
+  for (const v of MODEL_VARS) env[v] = pr.model;
+  return { model: pr.model, env };
+}
+
+function validateProvider(pr: Provider): void {
+  if (pr.kind !== 'ollama') throw new ClaudeCodeSwitcherError('BAD_PROVIDER', `Unknown provider "${String(pr.kind)}".`);
+  if (!/^https?:\/\/\S+$/.test(pr.baseUrl)) throw new ClaudeCodeSwitcherError('BAD_PROVIDER', `"${pr.baseUrl}" is not an http(s) URL.`);
+  if (!/^\S+$/.test(pr.model)) throw new ClaudeCodeSwitcherError('BAD_PROVIDER', `"${pr.model}" is not a model name.`);
 }
 
 export interface AccountIdentity {
@@ -133,6 +170,7 @@ export async function listProfiles(p: Paths): Promise<ProfileInfo[]> {
 
 export interface CreateOptions extends SeedOptions {
   mode: StorageMode;
+  provider?: Provider;
 }
 
 export interface CreateResult {
@@ -149,6 +187,7 @@ export async function createProfile(p: Paths, name: string, opts: CreateOptions)
   if (bad) throw new ClaudeCodeSwitcherError('BAD_NAME', bad);
   if (isDefaultProfile(name)) throw new ClaudeCodeSwitcherError('EXISTS', `"${DEFAULT_PROFILE}" is ~/.claude and already exists.`);
   if (opts.mode !== 'shared' && opts.mode !== 'own') throw new ClaudeCodeSwitcherError('BAD_MODE', `Unknown mode "${String(opts.mode)}".`);
+  if (opts.provider) validateProvider(opts.provider);
 
   await ensureProfilesRoot(p);
   const dir = profileDir(p, name);
@@ -165,8 +204,10 @@ export async function createProfile(p: Paths, name: string, opts: CreateOptions)
     createdAt: new Date().toISOString(),
     schemaVersion: SCHEMA_VERSION,
     ...(opts.mode === 'shared' ? { sharedTarget: p.claudeDir } : {}),
+    ...(opts.provider ? { provider: opts.provider } : {}),
   };
   await writeJsonAtomic(profileMeta(p, name), meta, 0o600);
+  if (opts.provider) await writeJsonAtomic(path.join(dir, PROVIDER_SETTINGS), providerSettings(opts.provider), 0o600);
 
   const seed = await seedProfile(p, name, {
     // shared profiles get settings/CLAUDE.md via symlink; copying would collide with the link.

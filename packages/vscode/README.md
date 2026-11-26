@@ -59,6 +59,29 @@ Confirm with `/usage` inside a conversation: it names the billing account.
   (Settings > System > For developers). Without it, adding an account fails
   with a message saying so, before anything is created.
 
+## Ollama accounts
+
+**Add another account… → Ollama** creates an account that sends requests to a local
+[Ollama](https://ollama.com) server instead of Anthropic: pick the server URL and one
+of its models; there is no sign-in. Route a folder to it like any other account.
+
+- The account's directory holds `provider-settings.json`: the server URL, the
+  `ollama` token, and the chosen model for `model`, `ANTHROPIC_MODEL`, every
+  `ANTHROPIC_DEFAULT_*_MODEL` alias and `CLAUDE_CODE_SUBAGENT_MODEL`. The wrapper
+  appends `--settings <that file>`, which outranks your `settings.json`, so a `model`
+  or `env` set there for Claude does not reach Ollama. Aliases (`opus`, `sonnet`…)
+  land on the local model; a full Claude model ID picked in the panel does not.
+- `claudecodeSwitcher.ollamaMode` decides where new Ollama accounts keep their state:
+  `shared` (default) shares settings, skills, MCP servers and history with
+  `~/.claude`; `own` gives them a separate directory. Do not resume a session
+  started on Claude from a shared Ollama account (or the reverse): the local model
+  gets a history it did not write.
+- Pick a model with tool calling. Claude Code sends about 15k tokens of prompt per
+  request; Ollama often loads models with a 32k context, which long sessions outgrow.
+  Raise it on the server (`OLLAMA_CONTEXT_LENGTH`, e.g. 65536) if the model has room.
+- The CLI's `shell-init` helper only exports `CLAUDE_CONFIG_DIR`, so in a terminal an
+  Ollama account needs `claude --settings <its provider-settings.json>`.
+
 ## The status bar is the whole UI
 
 Click **Claude: <account>** in the status bar. The menu is the account list:

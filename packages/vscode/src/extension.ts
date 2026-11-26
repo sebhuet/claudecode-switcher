@@ -112,7 +112,8 @@ async function refreshStatus(): Promise<void> {
     if (folder) {
       const r = await core.resolve({ cwd: folder, env: process.env, paths: p });
       text = `$(account) Claude: ${r.profile}`;
-      tip = `Folder: ${folder}\nProfile: ${r.profile} · mode ${r.mode}\nWhy: ${r.source}${r.detail ? ` — ${r.detail}` : ''}\nCLAUDE_CONFIG_DIR: ${r.configDir ?? '(unset → ~/.claude)'}`;
+      const prov = (await core.getProfile(p, r.profile))?.meta?.provider;
+      tip = `Folder: ${folder}\nProfile: ${r.profile} · mode ${r.mode}${prov ? `\nBackend: Ollama · ${prov.model} at ${prov.baseUrl}` : ''}\nWhy: ${r.source}${r.detail ? ` — ${r.detail}` : ''}\nCLAUDE_CONFIG_DIR: ${r.configDir ?? '(unset → ~/.claude)'}`;
     }
   } catch (e) {
     text = '$(warning) Claude: unknown profile';
@@ -154,6 +155,16 @@ function watchRoutingFiles(): void {
 
 // ---------------------------------------------------------------- pickers
 
+/** Provider accounts (Ollama) have no sign-in. */
+function needsLogin(x: core.ProfileInfo): boolean {
+  return !x.isDefault && !x.loggedIn && !x.meta?.provider;
+}
+
+function describe(x: core.ProfileInfo): string | undefined {
+  const pr = x.meta?.provider;
+  return pr ? `Ollama · ${pr.model}` : x.email ?? (x.isDefault ? '~/.claude' : undefined);
+}
+
 interface ProfilePick extends vscode.QuickPickItem {
   profile?: core.ProfileInfo;
 }
@@ -164,8 +175,8 @@ async function pickProfile(title: string, opts: { excludeDefault?: boolean; plac
     .filter((x) => !(opts.excludeDefault && x.isDefault))
     .map((x) => ({
       label: x.isDefault ? '$(home) default' : `$(account) ${x.name}`,
-      description: x.email ?? (x.isDefault ? '~/.claude' : undefined),
-      detail: x.loggedIn ? (x.organizationName ?? undefined) : 'not signed in',
+      description: describe(x),
+      detail: x.loggedIn ? (x.organizationName ?? undefined) : x.meta?.provider ? undefined : 'not signed in',
       profile: x,
     }));
   const pick = await vscode.window.showQuickPick(items, { title, placeHolder: opts.placeholder });
@@ -192,12 +203,49 @@ function configuredMode(): core.StorageMode {
   return 'shared';
 }
 
+/** Ollama accounts are the exception: `claudecodeSwitcher.ollamaMode` picks. */
+function ollamaMode(): core.StorageMode {
+  return vscode.workspace.getConfiguration('claudecodeSwitcher').get<string>('ollamaMode') === 'own' ? 'own' : 'shared';
+}
+
+async function pickOllamaModel(): Promise<core.Provider | undefined> {
+  const url = await vscode.window.showInputBox({
+    title: 'Ollama — server URL',
+    value: 'http://localhost:11434',
+    validateInput: (v) => (/^https?:\/\/\S+$/.test(v.trim()) ? undefined : 'An http(s) URL.'),
+  });
+  if (!url) return undefined;
+  const baseUrl = url.trim().replace(/\/+$/, '');
+  let models: { name: string; size: number }[];
+  try {
+    const res = await fetch(`${baseUrl}/api/tags`, { signal: AbortSignal.timeout(5000) });
+    models = ((await res.json()) as { models?: { name: string; size: number }[] }).models ?? [];
+  } catch (e) {
+    throw new Error(`Ollama is not answering at ${baseUrl} (${(e as Error).message}). Start it, then try again.`);
+  }
+  if (!models.length) throw new Error(`Ollama at ${baseUrl} has no model. Pull one first (ollama pull <model>).`);
+  const pick = await vscode.window.showQuickPick(
+    models.map((m) => ({ label: m.name, description: `${(m.size / 1e9).toFixed(1)} GB` })),
+    { title: 'Ollama — model', placeHolder: 'Pick a model with tool calling; Claude Code sends ~15k tokens of prompt per request' });
+  return pick && { kind: 'ollama', baseUrl, model: pick.label };
+}
+
 // ---------------------------------------------------------------- commands
 
 async function addAccount(): Promise<void> {
+  const kind = await vscode.window.showQuickPick(
+    [
+      { label: '$(account) Claude account', description: 'sign in to another Anthropic account', ollama: false },
+      { label: '$(server-process) Ollama', description: 'a local model, no sign-in', ollama: true },
+    ],
+    { title: 'Add account' });
+  if (!kind) return;
+  const provider = kind.ollama ? await pickOllamaModel() : undefined;
+  if (kind.ollama && !provider) return;
   const p = paths();
   const name = await vscode.window.showInputBox({
-    title: 'Add Claude account — profile name',
+    title: provider ? 'Add Ollama account — profile name' : 'Add Claude account — profile name',
+    value: provider ? `ollama-${provider.model.replace(/[^A-Za-z0-9._-]/g, '-')}`.slice(0, 64) : undefined,
     prompt: 'A short name, e.g. Work or Personal. Becomes a directory under ' + p.profilesRoot,
     validateInput: async (v) => {
       const bad = core.validateProfileName(v.trim());
@@ -207,8 +255,8 @@ async function addAccount(): Promise<void> {
     },
   });
   if (!name) return;
-  const mode = configuredMode();
-  const res = await core.createProfile(p, name.trim(), { mode, copySettings: mode === 'own', copyClaudeMd: mode === 'own' });
+  const mode = provider ? ollamaMode() : configuredMode();
+  const res = await core.createProfile(p, name.trim(), { mode, provider, copySettings: mode === 'own', copyClaudeMd: mode === 'own' });
   log(`created ${res.info.name} (${res.info.mode}); seeded ${res.seed.trustedProjects} trusted project(s)`);
   for (const f of res.link?.findings ?? []) log(`link ${f.severity}: ${f.message}`);
   await refreshStatus();
@@ -219,7 +267,11 @@ async function addAccount(): Promise<void> {
     return;
   }
   await routeFolder(folder, res.info.name);
-  await loginFlow(res.info.name);
+  if (provider) {
+    void vscode.window.showInformationMessage(`${path.basename(folder)} → ${res.info.name} (Ollama · ${provider.model}). Start a new conversation to use it.`);
+  } else {
+    await loginFlow(res.info.name);
+  }
 }
 
 async function routeFolder(folder: string, profile: string): Promise<void> {
@@ -310,7 +362,9 @@ async function showStatus(): Promise<void> {
   for (const pr of profiles) {
     const routed = map.filter((m) => m.profile.toLowerCase() === pr.name.toLowerCase()).map((m) => m.prefix);
     lines.push(`● ${pr.name}${pr.isDefault ? '  (~/.claude)' : `  [${pr.mode ?? 'legacy: no mode'}]`}`);
-    lines.push(`    login: ${pr.loggedIn ? `${pr.email ?? '?'}${pr.organizationName ? ` · ${pr.organizationName}` : ''} · uuid ${pr.accountUuid ?? '?'}` : 'NOT signed in'}`);
+    const prov = pr.meta?.provider;
+    if (prov) lines.push(`    backend: Ollama · ${prov.model} at ${prov.baseUrl} (no sign-in)`);
+    else lines.push(`    login: ${pr.loggedIn ? `${pr.email ?? '?'}${pr.organizationName ? ` · ${pr.organizationName}` : ''} · uuid ${pr.accountUuid ?? '?'}` : 'NOT signed in'}`);
     lines.push(`    dir:   ${pr.dir}`);
     if (routed.length) lines.push(`    folders: ${routed.join(', ')}`);
     const held = locks.filter((l) => l.profile === pr.name);
@@ -378,7 +432,7 @@ async function deleteProfileCommand(): Promise<void> {
   if (!prof) return;
   const routed = (await core.readMap(p)).filter((m) => m.profile === prof.name).map((m) => m.prefix);
   const detail =
-    `${prof.dir}\nmode: ${prof.mode ?? 'legacy'} · ${prof.loggedIn ? `signed in as ${prof.email ?? '?'}` : 'not signed in'}\n` +
+    `${prof.dir}\nmode: ${prof.mode ?? 'legacy'} · ${prof.loggedIn ? `signed in as ${prof.email ?? '?'}` : describe(prof) ?? 'not signed in'}\n` +
     (routed.length ? `routed folders (mappings will be removed): ${routed.join(', ')}\n` : '') +
     (prof.mode === 'shared'
       ? '\nshared: only the symlinks and this login go away; sessions, memory and settings stay in ~/.claude.'
@@ -470,10 +524,10 @@ async function menu(): Promise<void> {
     action: 'use',
     profile: x,
     label: x.isDefault ? 'Default account' : x.name,
-    description: x.email ?? (x.isDefault ? '~/.claude' : undefined),
+    description: describe(x),
     detail: x.name === current
       ? `Used by new conversations in ${folder ? path.basename(folder) : 'this folder'}`
-      : x.loggedIn
+      : x.loggedIn || x.meta?.provider
         ? undefined
         : 'Not signed in yet — sign-in opens when you pick it',
     picked: x.name === current,
@@ -497,7 +551,7 @@ async function menu(): Promise<void> {
   const target = folder ?? (await pickFolder('Route which folder?'));
   if (!target) return;
   await routeFolder(target, pick.profile.name);
-  if (!pick.profile.loggedIn && !pick.profile.isDefault) {
+  if (needsLogin(pick.profile)) {
     await loginFlow(pick.profile.name);
   } else {
     void vscode.window.showInformationMessage(`${path.basename(target)} → ${pick.profile.name}. Applies to new conversations; running ones keep their account.`);

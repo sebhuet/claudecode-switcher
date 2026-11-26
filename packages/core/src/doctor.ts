@@ -50,7 +50,10 @@ export async function doctor(p: Paths): Promise<DoctorReport> {
       const rj = await lstatOrNull(p.defaultClaudeJson);
       if (rj?.isSymbolicLink()) findings.push({ severity: 'error', code: 'ROOT_JSON_SYMLINK', message: `${p.defaultClaudeJson} is a symlink.`, path: p.defaultClaudeJson });
     }
-    if (!pr.loggedIn) {
+    const prov = pr.meta?.provider;
+    if (prov) {
+      findings.push({ severity: 'info', code: 'PROVIDER', message: `Uses ${prov.kind} (${prov.model} at ${prov.baseUrl}); no sign-in.` });
+    } else if (!pr.loggedIn) {
       findings.push({ severity: 'info', code: 'NOT_LOGGED_IN', message: `Not logged in (no oauthAccount in ${ROOT_JSON}).` });
     } else if (pr.accountUuid) {
       byUuid.set(pr.accountUuid, [...(byUuid.get(pr.accountUuid) ?? []), pr.name]);

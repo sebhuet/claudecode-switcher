@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0
+
+- **Ollama accounts.** `Add another account… → Ollama` routes a folder to a model served
+  by a local Ollama: no sign-in, every model alias maps to the chosen model, and
+  `claudecodeSwitcher.ollamaMode` picks shared or separate storage. The account's
+  `provider-settings.json` reaches Claude through `--settings`, so it outranks a `model`
+  or `env` in the user's `settings.json`.
+
 ## 0.1.1
 
 - **Windows support.** Routing works on plain Windows: the wrapper is a `.exe` compiled

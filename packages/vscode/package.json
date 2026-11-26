@@ -2,7 +2,7 @@
   "name": "claudecode-switcher",
   "displayName": "ClaudeCode Switcher",
   "description": "Use several Claude Code accounts on one project, or a different account per project, without ever logging out. Switch from the status bar; your sessions, memory, skills and settings stay intact across all accounts.",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "publisher": "prasunroy",
   "license": "MIT",
   "repository": {
@@ -53,6 +53,15 @@
           "type": "boolean",
           "default": true,
           "description": "Check shared profiles for drift (a symlink replaced by a real directory) when VS Code starts, and offer to relink."
+        },
+        "claudecodeSwitcher.ollamaMode": {
+          "type": "string",
+          "enum": [
+            "shared",
+            "own"
+          ],
+          "default": "shared",
+          "markdownDescription": "Storage for new Ollama accounts. `shared`: same settings, skills, MCP servers and history as `~/.claude` (avoid resuming a Claude session on the local model). `own`: a separate directory with its own history and settings. Fixed when the account is created."
         },
         "claudecodeSwitcher.loginMethod": {
           "type": "string",
