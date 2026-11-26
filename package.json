@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "build": "npm run build -w @claudecode-switcher/core && npm run build -w claudecode-switcher && npm run build -w claudecode-switcher-cli",
-    "test": "npm run test -w @claudecode-switcher/core",
+    "test": "npm run test -w @claudecode-switcher/core && npm run test -w claudecode-switcher",
     "typecheck": "tsc -p packages/core && tsc -p packages/vscode --noEmit && tsc -p packages/cli --noEmit",
     "package": "npm run build && npm run package -w claudecode-switcher",
     "e2e": "bash scripts/e2e.sh",

@@ -79,7 +79,8 @@
     "build": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc -p . --noEmit",
-    "package": "vsce package --no-dependencies -o ../../claudecode-switcher.vsix"
+    "package": "vsce package --no-dependencies -o ../../claudecode-switcher.vsix",
+    "test": "node esbuild.mjs --test && node --test dist/test/"
   },
   "icon": "icon.png",
   "galleryBanner": {

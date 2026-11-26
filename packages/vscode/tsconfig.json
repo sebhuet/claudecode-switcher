@@ -1,5 +1,5 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "rootDir": "..", "outDir": "dist-tsc", "types": ["node", "vscode"], "noEmit": true },
-  "include": ["src/**/*.ts", "../core/src/**/*.ts"]
+  "include": ["src/**/*.ts", "test/**/*.ts", "../core/src/**/*.ts"]
 }

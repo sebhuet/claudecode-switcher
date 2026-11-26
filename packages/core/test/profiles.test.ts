@@ -25,9 +25,10 @@ test('create writes mode once and lists correctly', async () => {
     const meta = JSON.parse(await fsp.readFile(path.join(sb.p.profilesRoot, 'Personal', 'profile.json'), 'utf8'));
     assert.equal(meta.mode, 'shared');
     assert.equal(meta.sharedTarget, sb.p.claudeDir);
-    const st = await fsp.stat(sb.p.profilesRoot);
-    assert.equal(st.mode & 0o777, 0o700);
-    assert.equal((await fsp.stat(path.join(sb.p.profilesRoot, 'Personal', '.claude.json'))).mode & 0o777, 0o600);
+    if (process.platform !== 'win32') { // Windows has no POSIX modes
+      assert.equal((await fsp.stat(sb.p.profilesRoot)).mode & 0o777, 0o700);
+      assert.equal((await fsp.stat(path.join(sb.p.profilesRoot, 'Personal', '.claude.json'))).mode & 0o777, 0o600);
+    }
   } finally {
     await sb.cleanup();
   }
