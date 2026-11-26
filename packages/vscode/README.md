@@ -39,8 +39,11 @@ there. This happens automatically; there is nothing to configure.
 1. Install, then install the official Claude Code extension if you have not.
 2. Click **Claude: default** in the status bar → **Add another account…** →
    **Claude account** → name it.
-3. The folder is routed to it and a sign-in opens. Sign in.
-4. Open another folder, click the status bar, pick a different account. Both run at once.
+3. The first time, allow routing (this sets `claudeCode.claudeProcessWrapper`
+   in your user settings), then, unless you already set one, pick the
+   permission mode new conversations start in (see [First use](#first-use)).
+4. The folder is routed to the account and a sign-in opens. Sign in.
+5. Open another folder, click the status bar, pick a different account. Both run at once.
 
 Confirm with `/usage` inside a conversation: it names the billing account.
 
@@ -66,6 +69,18 @@ Confirm with `/usage` inside a conversation: it names the billing account.
   .NET Framework 4 on every Windows 10/11. The child `claude.exe` is tied to
   the wrapper by a job object, so stopping a conversation stops both.
 
+## First use
+
+Routing is off until you allow it. The first time you route a folder, a
+dialog asks to set `claudeCode.claudeProcessWrapper`; if another wrapper is
+already set there, it says so, and Disable routing restores it.
+
+With any process wrapper configured, the official extension no longer asks the
+CLI for the default permission mode, so new conversations start in **Manual**.
+If `claudeCode.initialPermissionMode` is not set yet, a second question makes
+that explicit: `default` (Manual), `acceptEdits`,
+`plan`, or leave it unset. Disable routing removes the value it set.
+
 ## The status bar is the whole UI
 
 Click **Claude: <account>** in the status bar. The menu is the account list:
@@ -73,13 +88,22 @@ the account the current folder uses is marked, Ollama accounts show their
 model, accounts not signed in yet say so, and picking one routes the folder to
 it (and opens sign-in if needed).
 
+The status bar text adds an icon when routing is not active: a disconnected
+plug when it is off, a crossed-out circle when another wrapper is configured.
+**Claude: unknown profile** means a `.claude-profile` file, `CLAUDE_PROFILE`
+or a route names an account that does not exist; new conversations then fall
+back to the default account.
+
 Below the list:
 
 - **Add another account…**: a Claude account (name it, sign in) or an Ollama
   account (see below).
 - **Open Login Terminal**: sign an account in from a terminal instead (needs `claude` on `PATH`).
-- **More…**: remove an account, copy MCP servers between accounts, check health,
-  verify links, show status, open the accounts folder, disable or enable routing.
+- **More…**: remove an account (its login is kept under
+  `~/.claude-profiles/_backups/`), copy MCP servers between accounts, check
+  health, verify links, show status, open the accounts folder, disable or
+  enable routing. When profiles from another switcher are found, an import
+  entry appears too; imported profiles keep their own history and settings.
 
 There are no command palette entries.
 
@@ -103,7 +127,9 @@ What to know:
 - **Storage.** The `claudecodeSwitcher.ollamaMode` setting decides, when an
   account is created, where it keeps its state. `shared` (default): same
   settings, skills, MCP servers and history as `~/.claude`. `own`: a separate
-  directory with its own history and settings. Either way, do not resume a
+  directory with its own history and settings; the panel's conversation list
+  still shows the default store, so type `/resume` in a new conversation to see
+  its sessions. Either way, do not resume a
   conversation started on Claude from an Ollama account, or the reverse: the
   model gets a history it did not write.
 - **Context.** Claude Code sends about 15k tokens of prompt with every request,
@@ -115,8 +141,9 @@ What to know:
   alias and for subagents). The wrapper passes it with `--settings`, which
   outranks your `settings.json`, so a `model` or `env` set there for Claude does
   not reach Ollama.
-- **In a terminal**, the CLI's `shell-init` helper only sets `CLAUDE_CONFIG_DIR`;
-  run `claude --settings <the account's provider-settings.json>`.
+- **In a terminal**, nothing routes for you: set `CLAUDE_CONFIG_DIR` to the
+  account's directory and run
+  `claude --settings <the account's directory>/provider-settings.json`.
 
 ## Settings
 

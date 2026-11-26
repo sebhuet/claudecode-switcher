@@ -79,10 +79,10 @@ packages/
 ## Build
 
 ```
-npm install
+npm install            # Windows: npm ci --force (the CLI declares darwin/linux only)
 npm run build          # core (tsc) + extension (esbuild) + cli (esbuild)
 npm test               # core fixture tables, all against a temp $HOME
-npm run e2e            # mock-activates the extension against a temp $HOME
+npm run e2e            # bash: mock-activates the extension against a temp $HOME
 npm run e2e:win        # Windows: the compiled wrapper, against a temp $HOME
 npm run package        # → claudecode-switcher.vsix
 ```
