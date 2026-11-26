@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import * as core from '../../core/src';
 import { disableRouting, enableRouting, materialize, migrateLegacyInstall, officialExtensionInstalled, routingState, findClaude } from './routing';
+import { promptProvider } from './engine-prompt';
 
 let out: vscode.OutputChannel;
 let status: vscode.StatusBarItem;
@@ -113,7 +114,7 @@ async function refreshStatus(): Promise<void> {
       const r = await core.resolve({ cwd: folder, env: process.env, paths: p });
       text = `$(account) Claude: ${r.profile}`;
       const prov = (await core.getProfile(p, r.profile))?.meta?.provider;
-      tip = `Folder: ${folder}\nProfile: ${r.profile} · mode ${r.mode}${prov ? `\nBackend: Ollama · ${prov.model} at ${prov.baseUrl}` : ''}\nWhy: ${r.source}${r.detail ? ` — ${r.detail}` : ''}\nCLAUDE_CONFIG_DIR: ${r.configDir ?? '(unset → ~/.claude)'}`;
+      tip = `Folder: ${folder}\nProfile: ${r.profile} · mode ${r.mode}${prov ? `\nBackend: ${core.providerLabel(prov, true)}` : ''}\nWhy: ${r.source}${r.detail ? ` — ${r.detail}` : ''}\nCLAUDE_CONFIG_DIR: ${r.configDir ?? '(unset → ~/.claude)'}`;
     }
   } catch (e) {
     text = '$(warning) Claude: unknown profile';
@@ -155,14 +156,14 @@ function watchRoutingFiles(): void {
 
 // ---------------------------------------------------------------- pickers
 
-/** Provider accounts (Ollama) have no sign-in. */
+/** Provider accounts (engines.ts) have no sign-in. */
 function needsLogin(x: core.ProfileInfo): boolean {
   return !x.isDefault && !x.loggedIn && !x.meta?.provider;
 }
 
 function describe(x: core.ProfileInfo): string | undefined {
   const pr = x.meta?.provider;
-  return pr ? `Ollama · ${pr.model}` : x.email ?? (x.isDefault ? '~/.claude' : undefined);
+  return pr ? core.providerLabel(pr) : x.email ?? (x.isDefault ? '~/.claude' : undefined);
 }
 
 interface ProfilePick extends vscode.QuickPickItem {
@@ -208,44 +209,22 @@ function ollamaMode(): core.StorageMode {
   return vscode.workspace.getConfiguration('claudecodeSwitcher').get<string>('ollamaMode') === 'own' ? 'own' : 'shared';
 }
 
-async function pickOllamaModel(): Promise<core.Provider | undefined> {
-  const url = await vscode.window.showInputBox({
-    title: 'Ollama — server URL',
-    value: 'http://localhost:11434',
-    validateInput: (v) => (/^https?:\/\/\S+$/.test(v.trim()) ? undefined : 'An http(s) URL.'),
-  });
-  if (!url) return undefined;
-  const baseUrl = url.trim().replace(/\/+$/, '');
-  let models: { name: string; size: number }[];
-  try {
-    const res = await fetch(`${baseUrl}/api/tags`, { signal: AbortSignal.timeout(5000) });
-    models = ((await res.json()) as { models?: { name: string; size: number }[] }).models ?? [];
-  } catch (e) {
-    throw new Error(`Ollama is not answering at ${baseUrl} (${(e as Error).message}). Start it, then try again.`);
-  }
-  if (!models.length) throw new Error(`Ollama at ${baseUrl} has no model. Pull one first (ollama pull <model>).`);
-  const pick = await vscode.window.showQuickPick(
-    models.map((m) => ({ label: m.name, description: `${(m.size / 1e9).toFixed(1)} GB` })),
-    { title: 'Ollama — model', placeHolder: 'Pick a model with tool calling; Claude Code sends ~15k tokens of prompt per request' });
-  return pick && { kind: 'ollama', baseUrl, model: pick.label };
-}
-
 // ---------------------------------------------------------------- commands
 
 async function addAccount(): Promise<void> {
   const kind = await vscode.window.showQuickPick(
     [
-      { label: '$(account) Claude account', description: 'sign in to another Anthropic account', ollama: false },
-      { label: '$(server-process) Ollama', description: 'a local model, no sign-in', ollama: true },
+      { label: '$(account) Claude account', description: 'sign in to another Anthropic account', engine: undefined as core.Engine | undefined },
+      ...core.ENGINES.map((engine) => ({ label: `$(server-process) ${engine.label}`, description: engine.description, engine })),
     ],
     { title: 'Add account' });
   if (!kind) return;
-  const provider = kind.ollama ? await pickOllamaModel() : undefined;
-  if (kind.ollama && !provider) return;
+  const provider = kind.engine && (await promptProvider(kind.engine));
+  if (kind.engine && !provider) return;
   const p = paths();
   const name = await vscode.window.showInputBox({
-    title: provider ? 'Add Ollama account — profile name' : 'Add Claude account — profile name',
-    value: provider ? `ollama-${provider.model.replace(/[^A-Za-z0-9._-]/g, '-')}`.slice(0, 64) : undefined,
+    title: `Add ${kind.engine?.label ?? 'Claude'} account — profile name`,
+    value: provider ? `${provider.kind}-${provider.model.replace(/[^A-Za-z0-9._-]/g, '-')}`.slice(0, 64) : undefined,
     prompt: 'A short name, e.g. Work or Personal. Becomes a directory under ' + p.profilesRoot,
     validateInput: async (v) => {
       const bad = core.validateProfileName(v.trim());
@@ -268,7 +247,7 @@ async function addAccount(): Promise<void> {
   }
   await routeFolder(folder, res.info.name);
   if (provider) {
-    void vscode.window.showInformationMessage(`${path.basename(folder)} → ${res.info.name} (Ollama · ${provider.model}). Start a new conversation to use it.`);
+    void vscode.window.showInformationMessage(`${path.basename(folder)} → ${res.info.name} (${core.providerLabel(provider)}). Start a new conversation to use it.`);
   } else {
     await loginFlow(res.info.name);
   }
@@ -363,7 +342,7 @@ async function showStatus(): Promise<void> {
     const routed = map.filter((m) => m.profile.toLowerCase() === pr.name.toLowerCase()).map((m) => m.prefix);
     lines.push(`● ${pr.name}${pr.isDefault ? '  (~/.claude)' : `  [${pr.mode ?? 'legacy: no mode'}]`}`);
     const prov = pr.meta?.provider;
-    if (prov) lines.push(`    backend: Ollama · ${prov.model} at ${prov.baseUrl} (no sign-in)`);
+    if (prov) lines.push(`    backend: ${core.providerLabel(prov, true)} (no sign-in)`);
     else lines.push(`    login: ${pr.loggedIn ? `${pr.email ?? '?'}${pr.organizationName ? ` · ${pr.organizationName}` : ''} · uuid ${pr.accountUuid ?? '?'}` : 'NOT signed in'}`);
     lines.push(`    dir:   ${pr.dir}`);
     if (routed.length) lines.push(`    folders: ${routed.join(', ')}`);

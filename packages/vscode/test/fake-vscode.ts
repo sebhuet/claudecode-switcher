@@ -13,6 +13,8 @@ export const fake = {
   officialInstalled: true,
   answerMessage: (() => undefined) as Answer,
   answerPick: (() => undefined) as Answer,
+  /** Gets the input box options: { title, value, password, validateInput… }. */
+  answerInput: (() => undefined) as (o: Record<string, unknown>) => string | undefined,
   reset(): void {
     this.settings.clear();
     this.globalState.clear();
@@ -20,6 +22,7 @@ export const fake = {
     this.officialInstalled = true;
     this.answerMessage = () => undefined;
     this.answerPick = () => undefined;
+    this.answerInput = () => undefined;
   },
 };
 
@@ -40,6 +43,7 @@ const vscode = {
     showErrorMessage: async (m: string) => void fake.messages.push(m),
     showInformationMessage: async (m: string, ...items: unknown[]) => (fake.messages.push(m), fake.answerMessage(m, items)),
     showQuickPick: async (items: unknown[], o: { title?: string }) => fake.answerPick(o.title ?? '', items),
+    showInputBox: async (o: Record<string, unknown>) => fake.answerInput(o),
   },
 };
 
