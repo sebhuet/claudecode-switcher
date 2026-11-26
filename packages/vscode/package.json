@@ -54,6 +54,15 @@
           "default": true,
           "description": "Check shared profiles for drift (a symlink replaced by a real directory) when VS Code starts, and offer to relink."
         },
+        "claudecodeSwitcher.engineMode": {
+          "type": "string",
+          "enum": [
+            "shared",
+            "own"
+          ],
+          "default": "shared",
+          "markdownDescription": "Storage for new accounts on a local or third-party engine (Ollama…). `shared`: same settings, skills, MCP servers and history as `~/.claude` (avoid resuming a Claude session on another model). `own`: a separate directory with its own history and settings. Fixed when the account is created."
+        },
         "claudecodeSwitcher.ollamaMode": {
           "type": "string",
           "enum": [
@@ -61,7 +70,8 @@
             "own"
           ],
           "default": "shared",
-          "markdownDescription": "Storage for new Ollama accounts. `shared`: same settings, skills, MCP servers and history as `~/.claude` (avoid resuming a Claude session on the local model). `own`: a separate directory with its own history and settings. Fixed when the account is created."
+          "markdownDescription": "Storage for new Ollama accounts. `shared`: same settings, skills, MCP servers and history as `~/.claude` (avoid resuming a Claude session on the local model). `own`: a separate directory with its own history and settings. Fixed when the account is created.",
+          "markdownDeprecationMessage": "Use `claudecodeSwitcher.engineMode`; this one is read only while that is unset."
         },
         "claudecodeSwitcher.loginMethod": {
           "type": "string",

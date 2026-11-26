@@ -204,9 +204,11 @@ function configuredMode(): core.StorageMode {
   return 'shared';
 }
 
-/** Ollama accounts are the exception: `claudecodeSwitcher.ollamaMode` picks. */
-function ollamaMode(): core.StorageMode {
-  return vscode.workspace.getConfiguration('claudecodeSwitcher').get<string>('ollamaMode') === 'own' ? 'own' : 'shared';
+/** Engine accounts are the exception: `claudecodeSwitcher.engineMode` picks (0.2.0's `ollamaMode` still counts when it is unset). */
+function engineMode(): core.StorageMode {
+  const cfg = vscode.workspace.getConfiguration('claudecodeSwitcher');
+  const set = (k: string) => { const i = cfg.inspect<string>(k); return i?.workspaceFolderValue ?? i?.workspaceValue ?? i?.globalValue; };
+  return (set('engineMode') ?? set('ollamaMode')) === 'own' ? 'own' : 'shared';
 }
 
 // ---------------------------------------------------------------- commands
@@ -234,7 +236,7 @@ async function addAccount(): Promise<void> {
     },
   });
   if (!name) return;
-  const mode = provider ? ollamaMode() : configuredMode();
+  const mode = provider ? engineMode() : configuredMode();
   const res = await core.createProfile(p, name.trim(), { mode, provider, copySettings: mode === 'own', copyClaudeMd: mode === 'own' });
   log(`created ${res.info.name} (${res.info.mode}); seeded ${res.seed.trustedProjects} trusted project(s)`);
   for (const f of res.link?.findings ?? []) log(`link ${f.severity}: ${f.message}`);
