@@ -75,9 +75,12 @@ test('accounts written by 0.2.0 and unknown engines are read without failing', a
     await write(path.join(sb.p.profilesRoot, 'Future', 'profile.json'), JSON.stringify(meta('Future', { kind: 'future', model: 'm' })));
     assert.deepEqual((await getProfile(sb.p, 'Old'))?.meta?.provider, ollama);
     assert.deepEqual((await listProfiles(sb.p)).map((x) => x.name), ['default', 'Future', 'Old']);
-    const rep = await doctor(sb.p);
-    assert.equal(rep.profiles.length, 3);
-    assert.ok(rep.profiles.every((r) => r.findings.every((f) => !f.message.includes('undefined'))), JSON.stringify(rep, null, 1));
+    await write(path.join(sb.p.profilesRoot, 'Old', PROVIDER_SETTINGS), JSON.stringify(OLLAMA_SETTINGS));
+    const codes = async (n: string) => (await doctor(sb.p)).profiles.find((r) => r.profile.name === n)!.findings.map((f) => f.code);
+    const engineCodes = async (n: string) => (await codes(n)).filter((c) => c.includes('PROVIDER'));
+    assert.deepEqual(await engineCodes('Old'), ['PROVIDER']);
+    assert.deepEqual(await engineCodes('Future'), ['PROVIDER', 'UNKNOWN_PROVIDER', 'PROVIDER_SETTINGS_MISSING']);
+    assert.ok((await doctor(sb.p)).profiles.every((r) => r.findings.every((f) => !f.message.includes('undefined'))));
   } finally {
     await sb.cleanup();
   }

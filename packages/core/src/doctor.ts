@@ -5,11 +5,11 @@
 import * as path from 'node:path';
 import { CREDENTIALS_FILE, Paths, ROOT_JSON, profileClaudeJson } from './paths';
 import { lstatOrNull } from './fsx';
-import { listProfiles, ProfileInfo } from './profiles';
+import { PROVIDER_SETTINGS, listProfiles, ProfileInfo } from './profiles';
 import { Finding, verifyProfile } from './storage';
 import { readMap } from './map';
 import { listAllLocks } from './locks';
-import { providerLabel } from './engines';
+import { getEngine, providerLabel } from './engines';
 
 export interface ProfileReport {
   profile: ProfileInfo;
@@ -54,6 +54,13 @@ export async function doctor(p: Paths): Promise<DoctorReport> {
     const prov = pr.meta?.provider;
     if (prov) {
       findings.push({ severity: 'info', code: 'PROVIDER', message: `Uses ${providerLabel(prov, true)}; no sign-in.` });
+      if (!getEngine(prov.kind)) {
+        findings.push({ severity: 'warning', code: 'UNKNOWN_PROVIDER', message: `Engine "${prov.kind}" is unknown to this version of the extension.` });
+      }
+      const ps = path.join(pr.dir, PROVIDER_SETTINGS);
+      if (!(await lstatOrNull(ps))) {
+        findings.push({ severity: 'error', code: 'PROVIDER_SETTINGS_MISSING', message: `${PROVIDER_SETTINGS} is missing, so new conversations go to Anthropic. Remove the account and add it again.`, path: ps });
+      }
     } else if (!pr.loggedIn) {
       findings.push({ severity: 'info', code: 'NOT_LOGGED_IN', message: `Not logged in (no oauthAccount in ${ROOT_JSON}).` });
     } else if (pr.accountUuid) {
