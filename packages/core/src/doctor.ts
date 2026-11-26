@@ -59,7 +59,7 @@ export async function doctor(p: Paths): Promise<DoctorReport> {
       }
       const ps = path.join(pr.dir, PROVIDER_SETTINGS);
       if (!(await lstatOrNull(ps))) {
-        findings.push({ severity: 'error', code: 'PROVIDER_SETTINGS_MISSING', message: `${PROVIDER_SETTINGS} is missing, so new conversations go to Anthropic. Remove the account and add it again.`, path: ps });
+        findings.push({ severity: 'error', code: 'PROVIDER_SETTINGS_MISSING', message: `${PROVIDER_SETTINGS} is missing, so new conversations no longer reach the engine. Remove the account and add it again.`, path: ps });
       }
     } else if (!pr.loggedIn) {
       findings.push({ severity: 'info', code: 'NOT_LOGGED_IN', message: `Not logged in (no oauthAccount in ${ROOT_JSON}).` });

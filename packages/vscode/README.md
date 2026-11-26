@@ -123,8 +123,11 @@ account is created. Two engines:
 | **Anthropic-compatible server** | server URL, API key (may be empty) | `/v1/models`, else typed |
 
 The second one covers any server speaking the Anthropic Messages API: LM Studio
-(`http://localhost:1234`), llama.cpp, vLLM, LiteLLM, OpenRouter… A server that
-only speaks the OpenAI API needs a translating proxy such as LiteLLM in front.
+(`http://localhost:1234`), llama.cpp (`llama-server`, with `--jinja` for tools),
+vLLM, LiteLLM, OpenRouter (`https://openrouter.ai/api`)… Give the URL without
+`/v1`: Claude Code adds `/v1/messages` itself. A server that only speaks the
+OpenAI API needs a translating proxy such as LiteLLM in front. Models other
+than Claude work on a best-effort basis: tool calling depends on the model.
 
 1. Ollama: start it and pull a model with tool calling, e.g.
    `ollama pull qwen3-coder`. Another server: start it, or have its URL and key.
@@ -194,7 +197,7 @@ What to know:
   changing it. Also check that the server is running and still has the model
   (`ollama list`).
 - **Check health says `PROVIDER_SETTINGS_MISSING`.** The account's
-  `provider-settings.json` is gone, so its conversations go to Anthropic.
+  `provider-settings.json` is gone, so its conversations no longer reach the engine.
   Remove the account and add it again.
 
 ## How it works

@@ -12,7 +12,7 @@
 - **`claudecodeSwitcher.engineMode`** picks shared or separate storage for every engine;
   `ollamaMode` is deprecated and still read while it is unset.
 - **Check health** reports an engine unknown to this version, and an engine account whose
-  `provider-settings.json` is missing (its conversations would go to Anthropic).
+  `provider-settings.json` is missing (its conversations would no longer reach the engine).
 
 ## 0.2.0
 
